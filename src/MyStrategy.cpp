@@ -1,177 +1,341 @@
 #include "MyStrategy.h"
-
-#include <algorithm>
-#include <cmath>
-
 #include "sym.h"
 
-namespace
+#include <unordered_map>
+
+MyStrategy::MyStrategy()
+#ifdef PRINT
+	: writer(s)
+#endif
 {
-	struct point
-	{
-		double x;
-		double y;
-		double z;
-
-		double length()
-		{
-			return std::sqrt(x * x + y * y + z * z);
-		}
-
-		void norm()
-		{
-			auto d = length();
-			x /= d;
-			y /= d;
-			z /= d;
-		}
-
-		void reverse()
-		{
-			x = -x;
-			y = -y;
-			z = -z;
-		}
-
-		point add(point const& point)
-		{
-			return {
-				point.x + x,
-				point.y + y,
-				point.z + z,
-			};
-		}
-
-		point sub(point const& point)
-		{
-			return {
-				point.x - x,
-				point.y - y,
-				point.z - z,
-			};
-		}
-
-		void mul(double scalar)
-		{
-			x *= scalar;
-			y *= scalar;
-			z *= scalar;
-		}
-
-		void print(std::string title)
-		{
-			printf("%s { %f, %f, %f } length %f\r\n", title.c_str(), x, y, z, length());
-		}
-
-		void drop_normal(point const& normal)
-		{
-			if (1.0 - std::numeric_limits<double>::epsilon() < std::abs(normal.x) && std::abs(normal.x) < 1.0 + std::numeric_limits<double>::epsilon())
-				x = 0.0;
-			if (1.0 - std::numeric_limits<double>::epsilon() < std::abs(normal.y) && std::abs(normal.y) < 1.0 + std::numeric_limits<double>::epsilon())
-				y = 0.0;
-			if (1.0 - std::numeric_limits<double>::epsilon() < std::abs(normal.z) && std::abs(normal.z) < 1.0 + std::numeric_limits<double>::epsilon())
-				z = 0.0;
-		}
-
-		void check_range(model::Rules const& rules)
-		{
-			if (x < -rules.arena.width / 2.0 + rules.ROBOT_RADIUS)
-				x = -rules.arena.width / 2.0 + rules.ROBOT_RADIUS;
-			if (x > rules.arena.width / 2.0 - rules.ROBOT_RADIUS)
-				x = rules.arena.width / 2.0 - rules.ROBOT_RADIUS;
-
-			if (y < 0.0 + rules.ROBOT_RADIUS)
-				y = 0.0 + rules.ROBOT_RADIUS;
-			if (y > rules.arena.height - rules.ROBOT_RADIUS)
-				y = rules.arena.height - rules.ROBOT_RADIUS;
-
-			if (z < -rules.arena.depth / 2.0 - rules.arena.goal_depth + rules.ROBOT_RADIUS)
-				z = -rules.arena.depth / 2.0 - rules.arena.goal_depth + rules.ROBOT_RADIUS;
-			if (z > rules.arena.depth / 2.0 + rules.arena.goal_depth - rules.ROBOT_RADIUS)
-				z = rules.arena.depth / 2.0 + rules.arena.goal_depth - rules.ROBOT_RADIUS;
-		}
-	};
 }
-
-MyStrategy::MyStrategy() = default;
 
 void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::Game const& game, model::Action & action)
 {
-	sym::init(rules);
-
-	sym::ball.position = { game.ball.x, game.ball.y, game.ball.z };
-	sym::ball.velocity = { game.ball.velocity_x, game.ball.velocity_y, game.ball.velocity_z };
-
-	for (int unused = 0; unused < 100; ++unused)
-	{
-		sym::tick();
-
-	}
+	static int rpt = 0;
+	++rpt;
 
 	static int forward = -1;
 	static int goalkeeper = -1;
 
-	if (forward == -1 && goalkeeper == -1)
+	static std::unordered_map<int, model::Action> actions;
+
+	if (rpt == 1)
 	{
-		std::vector<std::pair<int, double>> robots;
+		static int goals = 0;
+		if (goals < game.players.front().score + game.players.back().score)
+		{
+			goals = game.players.front().score + game.players.back().score;
+			forward = -1;
+			goalkeeper = -1;
+		}
+
+		if (forward == -1 && goalkeeper == -1)
+		{
+			std::vector<std::pair<int, double>> robots;
+			for (auto const& robot : game.robots)
+				if (robot.is_teammate)
+					robots.push_back(std::make_pair(robot.id, robot.z));
+			std::sort(robots.begin(), robots.end(), [](std::pair<int, double> const& a, std::pair<int, double> const& b) { return a.second > b.second; });
+			forward = robots.front().first;
+			goalkeeper = robots.back().first;
+		}
+
+		static constexpr int ticks = 100;
+		static std::vector<sym::Vec3D> ball_positions(ticks);
+
+#ifdef PRINT
+		auto add_key = [&](std::string key) {
+			writer.Key(key.c_str(), key.length(), true);
+		};
+
+		s.Clear();
+		writer.Reset(s);
+		writer.StartArray();
+#endif
+
+		sym::init(rules);
+
+		sym::ball.position = { game.ball.x, game.ball.y, game.ball.z };
+		sym::ball.velocity = { game.ball.velocity_x, game.ball.velocity_y, game.ball.velocity_z };
+
+		sym::robots = {};
 		for (auto const& robot : game.robots)
-			if (robot.is_teammate)
-				robots.push_back(std::make_pair(robot.id, robot.z));
-		std::sort(robots.begin(), robots.end(), [](std::pair<int, double> const& a, std::pair<int, double> const& b) { return a.second > b.second; });
-		forward = robots.front().first;
-		goalkeeper = robots.back().first;
+		{
+			sym::robots.emplace_back();
+			sym::robots.back().arena_e = rules.ROBOT_ARENA_E;
+			sym::robots.back().mass = rules.ROBOT_MASS;
+			sym::robots.back().radius = robot.radius;
+			sym::robots.back().radius_change_speed = 0.0;
+			sym::robots.back().position = { robot.x, robot.y, robot.z };
+			sym::robots.back().velocity = { robot.velocity_x, robot.velocity_y, robot.velocity_z };
+			sym::robots.back().touch = robot.touch;
+			sym::robots.back().touch_normal = { robot.touch_normal_x, robot.touch_normal_y, robot.touch_normal_z };
+			sym::robots.back().nitro = robot.nitro_amount;
+		}
+
+		for (int tick = 0; tick < ticks; ++tick)
+		{
+			sym::tick();
+			ball_positions[tick] = sym::ball.position;
+
+#ifdef PRINT
+			writer.StartObject();
+			add_key("Sphere");
+			writer.StartObject();
+			add_key("x");
+			writer.Double(sym::ball.position.x);
+			add_key("y");
+			writer.Double(sym::ball.position.y);
+			add_key("z");
+			writer.Double(sym::ball.position.z);
+			add_key("radius");
+			writer.Double(0.5);
+			add_key("r");
+			writer.Double(1.0);
+			add_key("g");
+			writer.Double(1.0);
+			add_key("b");
+			writer.Double(1.0);
+			add_key("a");
+			writer.Double(0.5);
+			writer.EndObject(8);
+			writer.EndObject(1);
+#endif
+		}
+
+		auto ball_3d = sym::Vec3D{ game.ball.x, game.ball.y, game.ball.z };
+		auto ball_2d = sym::Vec2D{ game.ball.x, game.ball.z };
+
+		{
+			auto pos_3d = [&]() {
+				for (auto const& robot : game.robots)
+					if (robot.id == forward)
+						return sym::Vec3D{ robot.x, robot.y, robot.z };
+				return sym::Vec3D();
+			}();
+			auto pos_2d = sym::Vec2D{ pos_3d.x, pos_3d.z };
+			bool stay = true;
+			auto goal_2d = sym::Vec2D{ 0.0, rules.arena.depth / 2.0 };
+			double t = -1.0 / (double)rules.TICKS_PER_SECOND + 0.00001;
+			for (auto const& bp_3d : ball_positions)
+			{
+				t += 1.0 / (double)rules.TICKS_PER_SECOND;
+				auto bp_2d = sym::Vec2D{ bp_3d.x, bp_3d.z };
+				if (bp_3d.y > rules.ROBOT_MAX_RADIUS * 2.0 + game.ball.radius - std::numeric_limits<double>::epsilon())
+					continue;
+				auto best_pos = sym::normalize(goal_2d - bp_2d);
+				best_pos.x = -best_pos.x;
+				best_pos.y = -best_pos.y;
+				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS + game.ball.radius);
+				auto vel = best_pos - pos_2d;
+				auto distance = length(vel);
+				auto speed = distance / t;
+				if (0.0 < speed && speed <= rules.ROBOT_MAX_GROUND_SPEED)
+				{
+#ifdef PRINT
+					writer.StartObject();
+					add_key("Sphere");
+					writer.StartObject();
+					add_key("x");
+					writer.Double(best_pos.x);
+					add_key("y");
+					writer.Double(rules.ROBOT_MIN_RADIUS);
+					add_key("z");
+					writer.Double(best_pos.y);
+					add_key("radius");
+					writer.Double(0.5);
+					add_key("r");
+					writer.Double(0.0);
+					add_key("g");
+					writer.Double(1.0);
+					add_key("b");
+					writer.Double(1.0);
+					add_key("a");
+					writer.Double(1.0);
+					writer.EndObject(8);
+					writer.EndObject(1);
+#endif
+
+					vel = sym::normalize(vel) * speed;
+					actions[forward] = {};
+					actions[forward].target_velocity_x = vel.x;
+					actions[forward].target_velocity_y = 0.0;
+					actions[forward].target_velocity_z = vel.y;
+
+#ifdef PRINT
+					writer.StartObject();
+					add_key("Text");
+					add_key(std::to_string(sym::length(ball_3d - pos_3d)));
+					writer.EndObject(1);
+#endif
+
+					if (sym::length(ball_3d - pos_3d) < rules.ROBOT_MAX_RADIUS + game.ball.radius + 0.1)
+						actions[forward].jump_speed = rules.ROBOT_MAX_JUMP_SPEED;
+					stay = false;
+					break;
+				}
+			}
+
+			if (stay)
+			{
+				//???
+				auto tick = (int)(rules.ROBOT_MAX_GROUND_SPEED / (double)rules.TICKS_PER_SECOND);
+				auto bp_2d = sym::Vec2D{ ball_positions[tick].x, ball_positions[tick].z };
+				auto best_pos = sym::normalize(goal_2d - bp_2d);
+				best_pos.x = -best_pos.x;
+				best_pos.y = -best_pos.y;
+				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS + game.ball.radius);
+
+#ifdef PRINT
+				writer.StartObject();
+				add_key("Sphere");
+				writer.StartObject();
+				add_key("x");
+				writer.Double(best_pos.x);
+				add_key("y");
+				writer.Double(rules.ROBOT_MIN_RADIUS);
+				add_key("z");
+				writer.Double(best_pos.y);
+				add_key("radius");
+				writer.Double(0.5);
+				add_key("r");
+				writer.Double(0.0);
+				add_key("g");
+				writer.Double(1.0);
+				add_key("b");
+				writer.Double(1.0);
+				add_key("a");
+				writer.Double(0.5);
+				writer.EndObject(8);
+				writer.EndObject(1);
+#endif
+
+				auto vel = best_pos - pos_2d;
+				vel = sym::normalize(vel) * rules.ROBOT_MAX_GROUND_SPEED;
+				actions[forward] = {};
+				actions[forward].target_velocity_x = vel.x;
+				actions[forward].target_velocity_y = 0.0;
+				actions[forward].target_velocity_z = vel.y;
+			}
+		}
+
+		{
+			auto pos_3d = [&]() {
+				for (auto const& robot : game.robots)
+					if (robot.id == goalkeeper)
+						return sym::Vec3D{ robot.x, robot.y, robot.z };
+				return sym::Vec3D();
+			}();
+			auto pos_2d = sym::Vec2D{ pos_3d.x, pos_3d.z };
+			bool stay = true;
+			auto goal_2d = sym::Vec2D{ 0.0, -rules.arena.depth / 2.0 };
+			double t = -1.0 / (double)rules.TICKS_PER_SECOND + 0.00001;
+			for (auto const& bp_3d : ball_positions)
+			{
+				t += 1.0 / (double)rules.TICKS_PER_SECOND;
+				auto bp_2d = sym::Vec2D{ bp_3d.x, bp_3d.z };
+				if (length(bp_2d - goal_2d) > rules.arena.depth / 3.0)
+					continue;
+				if (bp_3d.y > rules.ROBOT_MAX_RADIUS * 2.0 + game.ball.radius - std::numeric_limits<double>::epsilon())
+					continue;
+				auto best_pos = sym::normalize(goal_2d - bp_2d);
+				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS + game.ball.radius);
+				auto vel = bp_2d - pos_2d;
+				auto distance = length(vel);
+				auto speed = distance / t;
+				if (0.0 < speed && speed <= rules.ROBOT_MAX_GROUND_SPEED)
+				{
+#ifdef PRINT
+					writer.StartObject();
+					add_key("Sphere");
+					writer.StartObject();
+					add_key("x");
+					writer.Double(best_pos.x);
+					add_key("y");
+					writer.Double(rules.ROBOT_MIN_RADIUS);
+					add_key("z");
+					writer.Double(best_pos.y);
+					add_key("radius");
+					writer.Double(0.5);
+					add_key("r");
+					writer.Double(1.0);
+					add_key("g");
+					writer.Double(1.0);
+					add_key("b");
+					writer.Double(0.0);
+					add_key("a");
+					writer.Double(1.0);
+					writer.EndObject(8);
+					writer.EndObject(1);
+#endif
+
+					vel = sym::normalize(vel) * speed;
+					actions[goalkeeper] = {};
+					actions[goalkeeper].target_velocity_x = vel.x;
+					actions[goalkeeper].target_velocity_y = 0.0;
+					actions[goalkeeper].target_velocity_z = vel.y;
+					if (sym::length(ball_3d - pos_3d) < rules.ROBOT_MAX_RADIUS + game.ball.radius + 0.1)
+						actions[goalkeeper].jump_speed = rules.ROBOT_MAX_JUMP_SPEED;
+					stay = false;
+					break;
+				}
+			}
+
+			if (stay)
+			{
+#ifdef PRINT
+				writer.StartObject();
+				add_key("Sphere");
+				writer.StartObject();
+				add_key("x");
+				writer.Double(goal_2d.x);
+				add_key("y");
+				writer.Double(rules.ROBOT_MIN_RADIUS);
+				add_key("z");
+				writer.Double(goal_2d.y);
+				add_key("radius");
+				writer.Double(0.5);
+				add_key("r");
+				writer.Double(1.0);
+				add_key("g");
+				writer.Double(1.0);
+				add_key("b");
+				writer.Double(0.0);
+				add_key("a");
+				writer.Double(0.5);
+				writer.EndObject(8);
+				writer.EndObject(1);
+#endif
+
+				auto vel = goal_2d - pos_2d;
+				vel = sym::normalize(vel) * std::min(rules.ROBOT_MAX_GROUND_SPEED, length(vel) * (double)rules.TICKS_PER_SECOND);
+				actions[goalkeeper] = {};
+				actions[goalkeeper].target_velocity_x = vel.x;
+				actions[goalkeeper].target_velocity_y = 0.0;
+				actions[goalkeeper].target_velocity_z = vel.y;
+			}
+		}
+
+#ifdef PRINT
+		writer.EndArray(ticks);
+#endif
+
 	}
+
+	if (rpt == game.robots.size() / 2)
+		rpt = 0;
 
 	if (me.id == forward)
-	{
-		point goal = { 0.0, 3.0 * rules.arena.goal_height / 4.0, rules.arena.depth / 2.0 };
-		point ball = { game.ball.x, game.ball.y, game.ball.z };
-		//ball = ball.add({ game.ball.velocity_x, game.ball.velocity_y, game.ball.velocity_z });
-		auto normal = ball.sub(goal);
-		normal.norm();
-		normal.reverse();
-		normal.mul(game.ball.radius + me.radius);
-		auto hfp = ball.add(normal);
-		hfp.check_range(rules);
-		point fw = { me.x, me.y, me.z };
-		//fw.add({ me.velocity_x, me.velocity_y, me.velocity_z });
-		point speed = fw.sub(hfp);
-		//speed.print("speed");
-		if (speed.length() < rules.ROBOT_MAX_RADIUS)
-			action.jump_speed = rules.ROBOT_MAX_JUMP_SPEED;
-		speed.drop_normal({ me.touch_normal_x, me.touch_normal_y, me.touch_normal_z });
-		speed.norm();
-		speed.mul(rules.ROBOT_MAX_GROUND_SPEED);
-		action.target_velocity_x = speed.x;
-		action.target_velocity_y = speed.y;
-		action.target_velocity_z = speed.z;
-	}
+		action = actions[forward];
 
 	if (me.id == goalkeeper)
-	{
-		point ball = { game.ball.x, game.ball.y, game.ball.z };
-		point hfp = {
-			[&]()
-			{
-				if (game.ball.x < -rules.arena.goal_width / 2.0 + rules.ROBOT_RADIUS * 2.0)
-					return -rules.arena.goal_width / 2.0 + rules.ROBOT_RADIUS * 2.0;
-				if (game.ball.x > rules.arena.goal_width / 2.0 - rules.ROBOT_RADIUS * 2.0)
-					return rules.arena.goal_width / 2.0 - rules.ROBOT_RADIUS * 2.0;
-				return game.ball.x;
-			}(),
-			rules.ROBOT_RADIUS, -rules.arena.depth / 2.0 - rules.arena.goal_side_radius - 0.3
-		};
-		point fw = { me.x, me.y, me.z };
-		auto to_ball = fw.sub(ball);
-		point speed = fw.sub(hfp);
-		//speed.print("speed");
-		if (to_ball.length() < rules.ROBOT_MAX_RADIUS + game.ball.radius)
-			action.jump_speed = rules.ROBOT_MAX_JUMP_SPEED;
-		speed.drop_normal({ me.touch_normal_x, me.touch_normal_y, me.touch_normal_z });
-		speed.norm();
-		speed.mul(rules.ROBOT_MAX_GROUND_SPEED); // wtf?
-		action.target_velocity_x = speed.x;
-		action.target_velocity_y = speed.y;
-		action.target_velocity_z = speed.z;
-	}
+		action = actions[goalkeeper];
 }
+
+#ifdef PRINT
+std::string MyStrategy::custom_rendering()
+{
+	return s.GetString();
+}
+#endif

@@ -189,9 +189,6 @@
     <ClInclude Include="rapidjson\writer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MyStrategy.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="RemoteProcessClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -202,5 +199,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="sym.h" />
+    <ClInclude Include="MyStrategy.h" />
   </ItemGroup>
 </Project>

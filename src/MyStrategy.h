@@ -7,11 +7,21 @@
 
 #include "Strategy.h"
 
-class MyStrategy : public Strategy {
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
+
+class MyStrategy : public Strategy
+{
 public:
     MyStrategy();
 
-    void act(const model::Robot& me, const model::Rules& rules, const model::Game& game, model::Action& action) override;
+	virtual void act(model::Robot const& me, model::Rules const& rules, model::Game const& game, model::Action & action) override;
+#ifdef PRINT
+	virtual std::string custom_rendering() override;
+
+	rapidjson::StringBuffer s;
+	rapidjson::Writer<rapidjson::StringBuffer> writer;
+#endif
 };
 
 #endif
