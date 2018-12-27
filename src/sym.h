@@ -519,7 +519,7 @@ namespace sym
 			a.position -= normal * penetration * k_a;
 			b.position += normal * penetration * k_b;
 			auto delta_velocity = dot(b.velocity - a.velocity, normal)
-				+ b.radius_change_speed - a.radius_change_speed;
+				- b.radius_change_speed - a.radius_change_speed;
 			if (delta_velocity < 0.0)
 			{
 				auto impulse = normal * ((1.0 + random(MIN_HIT_E, MAX_HIT_E)) * delta_velocity);
