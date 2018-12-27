@@ -152,7 +152,7 @@ namespace sym
 
 	double random(double min, double max)
 	{
-		return min;
+		return (max - min) / 2.0;
 	}
 
 	disnorm dan_to_plane(Vec3D const& point, Vec3D const& point_on_plane, Vec3D const& plane_normal)
@@ -179,7 +179,7 @@ namespace sym
 		};
 	}
 
-	struct tmp_arena
+	struct Arena
 	{
 		double width;
 		double height;
@@ -194,7 +194,7 @@ namespace sym
 		double top_radius;
 	};
 
-	static tmp_arena arena;
+	static Arena arena;
 
 	disnorm dan_to_arena_quarter(Vec3D const& point)
 	{
@@ -209,12 +209,12 @@ namespace sym
 
 		// Side z (goal)
 		dan = min(dan, dan_to_plane(
-			point,
-			{ 0.0, 0.0, (arena.depth / 2.0) + arena.goal_depth },
-			{ 0.0, 0.0, -1.0 }));
+				point,
+				{ 0.0, 0.0, (arena.depth / 2.0) + arena.goal_depth },
+				{ 0.0, 0.0, -1.0 }));
 
 		// Side z
-		auto v = Vec2D{ point.x, point.y } -Vec2D{
+		auto v = Vec2D { point.x, point.y } - Vec2D {
 				(arena.goal_width / 2.0) - arena.goal_top_radius,
 				arena.goal_height - arena.goal_top_radius };
 		if (point.x >= (arena.goal_width / 2.0) + arena.goal_side_radius
@@ -232,9 +232,9 @@ namespace sym
 		{
 			// x
 			dan = min(dan, dan_to_plane(
-				point,
-				{ arena.goal_width / 2.0, 0.0, 0.0 },
-				{ -1.0, 0.0, 0.0 }));
+					point,
+					{ arena.goal_width / 2.0, 0.0, 0.0 },
+					{ -1.0, 0.0, 0.0 }));
 			// y
 			dan = min(dan, dan_to_plane(point, { 0.0, arena.goal_height, 0.0 }, { 0.0, -1.0, 0.0 }));
 		}
@@ -244,34 +244,34 @@ namespace sym
 		if (point.z > (arena.depth / 2.0) + arena.goal_depth - arena.bottom_radius)
 		{
 			dan = min(dan, dan_to_sphere_inner(
-				point,
-				{
-					clamp(
-						point.x,
-						arena.bottom_radius - (arena.goal_width / 2.0),
-						(arena.goal_width / 2.0) - arena.bottom_radius
-					),
-					clamp(
-						point.y,
-						arena.bottom_radius,
-						arena.goal_height - arena.goal_top_radius
-					),
-					(arena.depth / 2.0) + arena.goal_depth - arena.bottom_radius },
-				arena.bottom_radius));
+					point,
+					{
+						clamp(
+							point.x,
+							arena.bottom_radius - (arena.goal_width / 2.0),
+							(arena.goal_width / 2.0) - arena.bottom_radius
+						),
+						clamp(
+							point.y,
+							arena.bottom_radius,
+							arena.goal_height - arena.goal_top_radius
+						),
+						(arena.depth / 2.0) + arena.goal_depth - arena.bottom_radius},
+					arena.bottom_radius));
 		}
 
 		// Corner
 		if (point.x > (arena.width / 2.0) - arena.corner_radius
-			&& point.z > (arena.depth / 2.0) - arena.corner_radius)
+				&& point.z > (arena.depth / 2.0) - arena.corner_radius)
 		{
 			dan = min(dan, dan_to_sphere_inner(
-				point,
-				{
-					(arena.width / 2.0) - arena.corner_radius,
-					point.y,
-					(arena.depth / 2.0) - arena.corner_radius
-				},
-				arena.corner_radius));
+					point,
+					{
+						(arena.width / 2.0) - arena.corner_radius,
+						point.y,
+						(arena.depth / 2.0) - arena.corner_radius
+					},
+					arena.corner_radius));
 		}
 
 		// Goal outer corner
@@ -281,69 +281,69 @@ namespace sym
 			if (point.x < (arena.goal_width / 2.0) + arena.goal_side_radius)
 			{
 				dan = min(dan, dan_to_sphere_outer(
-					point,
-					{
-						(arena.goal_width / 2.0) + arena.goal_side_radius,
-						point.y,
-						(arena.depth / 2.0) + arena.goal_side_radius
-					},
-					arena.goal_side_radius));
+						point,
+						{
+							(arena.goal_width / 2.0) + arena.goal_side_radius,
+							point.y,
+							(arena.depth / 2.0) + arena.goal_side_radius
+						},
+						arena.goal_side_radius));
 			}
 			// Ceiling
 			if (point.y < arena.goal_height + arena.goal_side_radius)
 			{
 				dan = min(dan, dan_to_sphere_outer(
-					point,
-					{
-						point.x,
-						arena.goal_height + arena.goal_side_radius,
-						(arena.depth / 2.0) + arena.goal_side_radius
-					},
-					arena.goal_side_radius));
+						point,
+						{
+							point.x,
+							arena.goal_height + arena.goal_side_radius,
+							(arena.depth / 2.0) + arena.goal_side_radius
+						},
+						arena.goal_side_radius));
 			}
 			// Top corner
-			auto o = Vec2D{
+			auto o = Vec2D {
 				(arena.goal_width / 2.0) - arena.goal_top_radius,
 				arena.goal_height - arena.goal_top_radius
 			};
-			auto v = Vec2D{ point.x, point.y } -o;
+			auto v = Vec2D { point.x, point.y } - o;
 			if (v.x > 0.0 && v.y > 0.0)
 			{
 				o = o + normalize(v) * (arena.goal_top_radius + arena.goal_side_radius);
 				dan = min(dan, dan_to_sphere_outer(
-					point,
-					{ o.x, o.y, (arena.depth / 2.0) + arena.goal_side_radius },
-					arena.goal_side_radius));
+						point,
+						{ o.x, o.y, (arena.depth / 2.0) + arena.goal_side_radius },
+						arena.goal_side_radius));
 			}
 		}
 
 		// Goal inside top corners
 		if (point.z > (arena.depth / 2.0) + arena.goal_side_radius
-			&& point.y > arena.goal_height - arena.goal_top_radius)
+				&& point.y > arena.goal_height - arena.goal_top_radius)
 		{
 			// Side x
 			if (point.x > (arena.goal_width / 2.0) - arena.goal_top_radius)
 			{
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{
-						(arena.goal_width / 2.0) - arena.goal_top_radius,
-						arena.goal_height - arena.goal_top_radius,
-						point.z
-					},
-					arena.goal_top_radius));
+						point,
+						{
+							(arena.goal_width / 2.0) - arena.goal_top_radius,
+							arena.goal_height - arena.goal_top_radius,
+							point.z
+						},
+						arena.goal_top_radius));
 			}
 			// Side z
 			if (point.z > (arena.depth / 2.0) + arena.goal_depth - arena.goal_top_radius)
 			{
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{
-						point.x,
-						arena.goal_height - arena.goal_top_radius,
-						(arena.depth / 2.0) + arena.goal_depth - arena.goal_top_radius
-					},
-					arena.goal_top_radius));
+						point,
+						{
+							point.x,
+							arena.goal_height - arena.goal_top_radius,
+							(arena.depth / 2.0) + arena.goal_depth - arena.goal_top_radius
+						},
+						arena.goal_top_radius));
 			}
 		}
 
@@ -354,85 +354,85 @@ namespace sym
 			if (point.x > (arena.width / 2.0) - arena.bottom_radius)
 			{
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{
-						(arena.width / 2.0) - arena.bottom_radius,
-						arena.bottom_radius,
-						point.z
-					},
-					arena.bottom_radius));
+						point,
+						{
+							(arena.width / 2.0) - arena.bottom_radius,
+							arena.bottom_radius,
+							point.z
+						},
+						arena.bottom_radius));
 			}
 			// Side z
 			if (point.z > (arena.depth / 2.0) - arena.bottom_radius
-				&& point.x >= (arena.goal_width / 2.0) + arena.goal_side_radius)
+					&& point.x >= (arena.goal_width / 2.0) + arena.goal_side_radius)
 			{
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{
-						point.x,
-						arena.bottom_radius,
-						(arena.depth / 2.0) - arena.bottom_radius
-					},
-					arena.bottom_radius));
+						point,
+						{
+							point.x,
+							arena.bottom_radius,
+							(arena.depth / 2.0) - arena.bottom_radius
+						},
+						arena.bottom_radius));
 			}
 			// Side z (goal)
 			if (point.z > (arena.depth / 2.0) + arena.goal_depth - arena.bottom_radius)
 			{
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{
-						point.x,
-						arena.bottom_radius,
-						(arena.depth / 2.0) + arena.goal_depth - arena.bottom_radius
-					},
-					arena.bottom_radius));
+						point,
+						{
+							point.x,
+							arena.bottom_radius,
+							(arena.depth / 2.0) + arena.goal_depth - arena.bottom_radius
+						},
+						arena.bottom_radius));
 			}
 			// Goal outer corner
-			auto o = Vec2D{
+			auto o = Vec2D {
 				(arena.goal_width / 2.0) + arena.goal_side_radius,
 				(arena.depth / 2.0) + arena.goal_side_radius
 			};
-			auto v = Vec2D{ point.x, point.z } -o;
+			auto v = Vec2D { point.x, point.z } - o;
 			if (v.x < 0.0 && v.y < 0.0
-				&& length(v) < arena.goal_side_radius + arena.bottom_radius)
+					&& length(v) < arena.goal_side_radius + arena.bottom_radius)
 			{
 				o = o + normalize(v) * (arena.goal_side_radius + arena.bottom_radius);
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{ o.x, arena.bottom_radius, o.y },
-					arena.bottom_radius));
+						point,
+						{ o.x, arena.bottom_radius, o.y },
+						arena.bottom_radius));
 			}
 			// Side x (goal)
 			if (point.z >= (arena.depth / 2.0) + arena.goal_side_radius
-				&& point.x > (arena.goal_width / 2.0) - arena.bottom_radius)
+					&& point.x > (arena.goal_width / 2.0) - arena.bottom_radius)
 			{
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{
-						(arena.goal_width / 2.0) - arena.bottom_radius,
-						arena.bottom_radius,
-						point.z
-					},
-					arena.bottom_radius));
+						point,
+						{
+							(arena.goal_width / 2.0) - arena.bottom_radius,
+							arena.bottom_radius,
+							point.z
+						},
+						arena.bottom_radius));
 			}
 			// Corner
 			if (point.x > (arena.width / 2.0) - arena.corner_radius
-				&& point.z > (arena.depth / 2.0) - arena.corner_radius)
+					&& point.z > (arena.depth / 2.0) - arena.corner_radius)
 			{
-				auto corner_o = Vec2D{
+				auto corner_o = Vec2D {
 					(arena.width / 2.0) - arena.corner_radius,
 					(arena.depth / 2.0) - arena.corner_radius
 				};
-				auto n = Vec2D{ point.x, point.z } -corner_o;
+				auto n = Vec2D { point.x, point.z } - corner_o;
 				auto dist = length(n);
 				if (dist > arena.corner_radius - arena.bottom_radius)
 				{
 					n = n / dist;
 					auto o2 = corner_o + n * (arena.corner_radius - arena.bottom_radius);
 					dan = min(dan, dan_to_sphere_inner(
-						point,
-						{ o2.x, arena.bottom_radius, o2.y },
-						arena.bottom_radius));
+							point,
+							{ o2.x, arena.bottom_radius, o2.y },
+							arena.bottom_radius));
 				}
 			}
 		}
@@ -444,48 +444,48 @@ namespace sym
 			if (point.x > (arena.width / 2.0) - arena.top_radius)
 			{
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{
-						(arena.width / 2.0) - arena.top_radius,
-						arena.height - arena.top_radius,
-						point.z,
-					},
-					arena.top_radius));
+						point,
+						{
+							(arena.width / 2.0) - arena.top_radius,
+							arena.height - arena.top_radius,
+							point.z,
+						},
+						arena.top_radius));
 			}
 			// Side z
 			if (point.z > (arena.depth / 2.0) - arena.top_radius)
 			{
 				dan = min(dan, dan_to_sphere_inner(
-					point,
-					{
-						point.x,
-						arena.height - arena.top_radius,
-						(arena.depth / 2.0) - arena.top_radius
-					},
-					arena.top_radius));
+						point,
+						{
+							point.x,
+							arena.height - arena.top_radius,
+							(arena.depth / 2.0) - arena.top_radius
+						},
+						arena.top_radius));
 			}
 
 			// Corner
 			if (point.x > (arena.width / 2.0) - arena.corner_radius
-				&& point.z > (arena.depth / 2.0) - arena.corner_radius)
+					&& point.z > (arena.depth / 2.0) - arena.corner_radius)
 			{
-				auto corner_o = Vec2D{
+				auto corner_o = Vec2D {
 					(arena.width / 2.0) - arena.corner_radius,
 					(arena.depth / 2.0) - arena.corner_radius
 				};
-				auto dv = Vec2D{ point.x, point.z } -corner_o;
+				auto dv = Vec2D { point.x, point.z } - corner_o;
 				if (length(dv) > arena.corner_radius - arena.top_radius)
 				{
 					auto n = normalize(dv);
 					auto o2 = corner_o + n * (arena.corner_radius - arena.top_radius);
 					dan = min(dan, dan_to_sphere_inner(
-						point,
-						{ o2.x, arena.height - arena.top_radius, o2.y },
-						arena.top_radius));
+							point,
+							{ o2.x, arena.height - arena.top_radius, o2.y },
+							arena.top_radius));
 				}
 			}
 		}
-
+    
 		return dan;
 	}
 
@@ -531,7 +531,7 @@ namespace sym
 
 	std::optional<Vec3D> collide_with_arena(Entity & e)
 	{
-		auto[distance, normal] = dan_to_arena(e.position);
+		auto [distance, normal] = dan_to_arena(e.position);
 		auto penetration = e.radius - distance;
 		if (penetration > 0.0)
 		{
@@ -554,7 +554,7 @@ namespace sym
 		e.velocity.y -= GRAVITY * delta_time;
 	}
 
-	struct tmp_robot : Entity
+	struct Robot : Entity
 	{
 		bool touch;
 		Vec3D touch_normal;
@@ -569,36 +569,36 @@ namespace sym
 		} action;
 	};
 
-	void shuffle(std::vector<tmp_robot> & robots)
+	void shuffle(std::vector<Robot> & robots)
 	{
-		//???
+		// nothing
 	}
 
-	static std::vector<tmp_robot> robots;
+	static std::vector<Robot> robots;
 
 	double max(double a, double b)
 	{
 		return std::max(a, b);
 	}
 
-	struct tmp_ball : Entity
+	struct Ball : Entity
 	{
 	};
 
-	static tmp_ball ball;
+	static Ball ball;
 
 	void goal_scored()
 	{
-
+		// nothing
 	}
 
-	struct tmp_pack : Entity
+	struct Pack : Entity
 	{
 		bool alive;
 		int respawn_ticks;
 	};
 
-	static std::vector<tmp_pack> nitro_packs;
+	static std::vector<Pack> nitro_packs;
 
 	void update(double delta_time)
 	{
@@ -643,7 +643,7 @@ namespace sym
 
 			move(robot, delta_time);
 			robot.radius = ROBOT_MIN_RADIUS + (ROBOT_MAX_RADIUS - ROBOT_MIN_RADIUS)
-				* robot.action.jump_speed / ROBOT_MAX_JUMP_SPEED;
+						* robot.action.jump_speed / ROBOT_MAX_JUMP_SPEED;
 			robot.radius_change_speed = robot.action.jump_speed;
 		}
 

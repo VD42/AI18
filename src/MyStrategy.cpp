@@ -104,20 +104,20 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 #endif
 		}
 
-		auto ball_3d = sym::Vec3D{ game.ball.x, game.ball.y, game.ball.z };
-		auto ball_2d = sym::Vec2D{ game.ball.x, game.ball.z };
+		auto ball_3d = sym::Vec3D { game.ball.x, game.ball.y, game.ball.z };
+		auto ball_2d = sym::Vec2D { game.ball.x, game.ball.z };
 
 		{
-			auto pos_3d = [&]() {
+			auto pos_3d = [&] () {
 				for (auto const& robot : game.robots)
 					if (robot.id == forward)
-						return sym::Vec3D{ robot.x, robot.y, robot.z };
+						return sym::Vec3D { robot.x, robot.y, robot.z };
 				return sym::Vec3D();
 			}();
-			auto pos_2d = sym::Vec2D{ pos_3d.x, pos_3d.z };
+			auto pos_2d = sym::Vec2D { pos_3d.x, pos_3d.z };
 			bool stay = true;
 			auto goal_2d = sym::Vec2D{ 0.0, rules.arena.depth / 2.0 };
-			double t = -1.0 / (double)rules.TICKS_PER_SECOND + 0.00001;
+			double t = 0.0;
 			for (auto const& bp_3d : ball_positions)
 			{
 				t += 1.0 / (double)rules.TICKS_PER_SECOND;
@@ -127,7 +127,7 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 				auto best_pos = sym::normalize(goal_2d - bp_2d);
 				best_pos.x = -best_pos.x;
 				best_pos.y = -best_pos.y;
-				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS + game.ball.radius);
+				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS / 2.0 + game.ball.radius);
 				auto vel = best_pos - pos_2d;
 				auto distance = length(vel);
 				auto speed = distance / t;
@@ -170,7 +170,7 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 					writer.EndObject(1);
 #endif
 
-					if (sym::length(ball_3d - pos_3d) < rules.ROBOT_MAX_RADIUS + game.ball.radius + 0.1)
+					if (sym::length(ball_3d - pos_3d) < 2.0 * rules.ROBOT_MIN_RADIUS + game.ball.radius)
 						actions[forward].jump_speed = rules.ROBOT_MAX_JUMP_SPEED;
 					stay = false;
 					break;
@@ -179,13 +179,11 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 
 			if (stay)
 			{
-				//???
-				auto tick = (int)(rules.ROBOT_MAX_GROUND_SPEED / (double)rules.TICKS_PER_SECOND);
-				auto bp_2d = sym::Vec2D{ ball_positions[tick].x, ball_positions[tick].z };
+				auto bp_2d = sym::Vec2D{ ball_positions.back().x, ball_positions.back().z };
 				auto best_pos = sym::normalize(goal_2d - bp_2d);
 				best_pos.x = -best_pos.x;
 				best_pos.y = -best_pos.y;
-				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS + game.ball.radius);
+				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS / 2.0 + game.ball.radius);
 
 #ifdef PRINT
 				writer.StartObject();
@@ -221,7 +219,7 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 		}
 
 		{
-			auto pos_3d = [&]() {
+			auto pos_3d = [&] () {
 				for (auto const& robot : game.robots)
 					if (robot.id == goalkeeper)
 						return sym::Vec3D{ robot.x, robot.y, robot.z };
@@ -230,7 +228,7 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 			auto pos_2d = sym::Vec2D{ pos_3d.x, pos_3d.z };
 			bool stay = true;
 			auto goal_2d = sym::Vec2D{ 0.0, -rules.arena.depth / 2.0 };
-			double t = -1.0 / (double)rules.TICKS_PER_SECOND + 0.00001;
+			double t = 0.0;
 			for (auto const& bp_3d : ball_positions)
 			{
 				t += 1.0 / (double)rules.TICKS_PER_SECOND;
@@ -240,7 +238,7 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 				if (bp_3d.y > rules.ROBOT_MAX_RADIUS * 2.0 + game.ball.radius - std::numeric_limits<double>::epsilon())
 					continue;
 				auto best_pos = sym::normalize(goal_2d - bp_2d);
-				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS + game.ball.radius);
+				best_pos = bp_2d + best_pos * (rules.ROBOT_MIN_RADIUS / 2.0 + game.ball.radius);
 				auto vel = bp_2d - pos_2d;
 				auto distance = length(vel);
 				auto speed = distance / t;
@@ -275,7 +273,7 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 					actions[goalkeeper].target_velocity_x = vel.x;
 					actions[goalkeeper].target_velocity_y = 0.0;
 					actions[goalkeeper].target_velocity_z = vel.y;
-					if (sym::length(ball_3d - pos_3d) < rules.ROBOT_MAX_RADIUS + game.ball.radius + 0.1)
+					if (sym::length(ball_3d - pos_3d) < 2.0 * rules.ROBOT_MIN_RADIUS + game.ball.radius)
 						actions[goalkeeper].jump_speed = rules.ROBOT_MAX_JUMP_SPEED;
 					stay = false;
 					break;
@@ -317,9 +315,9 @@ void MyStrategy::act(model::Robot const& me, model::Rules const& rules, model::G
 			}
 		}
 
-#ifdef PRINT
+	#ifdef PRINT
 		writer.EndArray(ticks);
-#endif
+	#endif
 
 	}
 
