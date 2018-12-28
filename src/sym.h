@@ -28,6 +28,18 @@ namespace sym
 	{
 		double x;
 		double y;
+
+		void operator+=(Vec2D const& a)
+		{
+			x += a.x;
+			y += a.y;
+		}
+
+		void operator-=(Vec2D const& a)
+		{
+			x -= a.x;
+			y -= a.y;
+		}
 	};
 
 	Vec2D operator+(Vec2D const& a, Vec2D const& b)
@@ -132,6 +144,15 @@ namespace sym
 	}
 
 	Vec3D clamp(Vec3D const& value, double max)
+	{
+		auto l = length(value);
+		if (l < max)
+			return value;
+		auto n = normalize(value);
+		return n * max;
+	}
+
+	Vec2D clamp(Vec2D const& value, double max)
 	{
 		auto l = length(value);
 		if (l < max)
